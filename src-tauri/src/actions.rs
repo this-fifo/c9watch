@@ -71,11 +71,18 @@ pub fn open_session(pid: u32, project_path: String) -> Result<(), String> {
 #[cfg(target_os = "macos")]
 fn get_process_tty(pid: u32) -> Option<String> {
     let output = Command::new("ps")
-        .arg("-o").arg("tty=")
-        .arg("-p").arg(pid.to_string())
-        .output().ok()?;
+        .arg("-o")
+        .arg("tty=")
+        .arg("-p")
+        .arg(pid.to_string())
+        .output()
+        .ok()?;
     let tty = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if tty.is_empty() || tty == "??" { None } else { Some(tty) }
+    if tty.is_empty() || tty == "??" {
+        None
+    } else {
+        Some(tty)
+    }
 }
 
 /// Walk up the process tree to find a tty (Claude may be a child process)
@@ -87,12 +94,19 @@ fn get_session_tty(pid: u32) -> Option<String> {
             return Some(tty);
         }
         let ppid_output = Command::new("ps")
-            .arg("-o").arg("ppid=")
-            .arg("-p").arg(current_pid.to_string())
-            .output().ok()?;
+            .arg("-o")
+            .arg("ppid=")
+            .arg("-p")
+            .arg(current_pid.to_string())
+            .output()
+            .ok()?;
         let ppid: u32 = String::from_utf8_lossy(&ppid_output.stdout)
-            .trim().parse().ok()?;
-        if ppid <= 1 { break; }
+            .trim()
+            .parse()
+            .ok()?;
+        if ppid <= 1 {
+            break;
+        }
         current_pid = ppid;
     }
     None
@@ -181,7 +195,11 @@ pub fn get_iterm2_session_title(pid: u32) -> Option<String> {
         .ok()?;
 
     let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if title.is_empty() { None } else { Some(title) }
+    if title.is_empty() {
+        None
+    } else {
+        Some(title)
+    }
 }
 
 /// Platform-specific fallback to activate/focus an application
@@ -765,5 +783,192 @@ mod tests {
         assert_eq!(get_app_name("code"), Some("Visual Studio Code"));
         assert_eq!(get_app_name("zed"), Some("Zed"));
         assert_eq!(get_app_name("cursor"), Some("Cursor"));
+    }
+
+    #[test]
+    fn test_get_app_name_all_terminals() {
+        assert_eq!(get_app_name("warp"), Some("Warp"));
+        assert_eq!(get_app_name("hyper"), Some("Hyper"));
+        assert_eq!(get_app_name("iterm2"), Some("iTerm"));
+        assert_eq!(get_app_name("iterm"), Some("iTerm"));
+        assert_eq!(get_app_name("terminal"), Some("Terminal"));
+        assert_eq!(get_app_name("wezterm"), Some("WezTerm"));
+        assert_eq!(get_app_name("wezterm-gui"), Some("WezTerm"));
+        assert_eq!(get_app_name("foot"), Some("foot"));
+        assert_eq!(get_app_name("gnome-terminal"), Some("GNOME Terminal"));
+        assert_eq!(get_app_name("gnome-terminal-server"), Some("GNOME Terminal"));
+        assert_eq!(get_app_name("konsole"), Some("Konsole"));
+        assert_eq!(get_app_name("xfce4-terminal"), Some("Xfce Terminal"));
+        assert_eq!(get_app_name("xterm"), Some("xterm"));
+        assert_eq!(get_app_name("tilix"), Some("Tilix"));
+        assert_eq!(get_app_name("terminator"), Some("Terminator"));
+        assert_eq!(get_app_name("/usr/bin/warp"), Some("Warp"));
+    }
+
+    #[test]
+    fn test_get_app_name_all_ides() {
+        assert_eq!(get_app_name("windsurf"), Some("Windsurf"));
+        assert_eq!(get_app_name("zed-editor"), Some("Zed"));
+        assert_eq!(get_app_name("sublime_text"), Some("Sublime Text"));
+        assert_eq!(get_app_name("subl"), Some("Sublime Text"));
+        assert_eq!(get_app_name("atom"), Some("Atom"));
+        assert_eq!(get_app_name("code helper"), Some("Visual Studio Code"));
+        assert_eq!(get_app_name("electron"), Some("Visual Studio Code"));
+    }
+
+    #[test]
+    fn test_get_app_name_jetbrains_binary_names() {
+        assert_eq!(get_app_name("phpstorm"), Some("PhpStorm"));
+        assert_eq!(get_app_name("idea"), Some("IntelliJ IDEA"));
+        assert_eq!(get_app_name("webstorm"), Some("WebStorm"));
+        assert_eq!(get_app_name("pycharm"), Some("PyCharm"));
+        assert_eq!(get_app_name("goland"), Some("GoLand"));
+        assert_eq!(get_app_name("clion"), Some("CLion"));
+        assert_eq!(get_app_name("rider"), Some("Rider"));
+        assert_eq!(get_app_name("rubymine"), Some("RubyMine"));
+        assert_eq!(get_app_name("datagrip"), Some("DataGrip"));
+        assert_eq!(get_app_name("studio"), Some("Android Studio"));
+        assert_eq!(get_app_name("aqua"), Some("Aqua"));
+        assert_eq!(get_app_name("fleet"), Some("Fleet"));
+        assert_eq!(get_app_name("rustrover"), Some("RustRover"));
+    }
+
+    #[test]
+    fn test_get_app_name_unknown_returns_none() {
+        assert_eq!(get_app_name("unknown_editor"), None);
+        assert_eq!(get_app_name(""), None);
+        assert_eq!(get_app_name("vim"), None);
+        assert_eq!(get_app_name("emacs"), None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_app_name_macos_app_paths() {
+        assert_eq!(
+            get_app_name("/Applications/Zed.app/Contents/MacOS/zed"),
+            Some("Zed")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Visual Studio Code.app/Contents/MacOS/Electron"),
+            Some("Visual Studio Code")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Cursor.app/Contents/MacOS/Cursor"),
+            Some("Cursor")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Windsurf.app/Contents/MacOS/Windsurf"),
+            Some("Windsurf")
+        );
+        assert_eq!(
+            get_app_name("/Applications/iTerm.app/Contents/MacOS/iTerm2"),
+            Some("iTerm")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Alacritty.app/Contents/MacOS/alacritty"),
+            Some("Alacritty")
+        );
+        assert_eq!(
+            get_app_name("/Applications/kitty.app/Contents/MacOS/kitty"),
+            Some("kitty")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Warp.app/Contents/MacOS/warp"),
+            Some("Warp")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Hyper.app/Contents/MacOS/Hyper"),
+            Some("Hyper")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Sublime Text.app/Contents/MacOS/sublime_text"),
+            Some("Sublime Text")
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_app_name_jetbrains_app_paths() {
+        assert_eq!(
+            get_app_name("/Applications/PhpStorm.app/Contents/MacOS/phpstorm"),
+            Some("PhpStorm")
+        );
+        assert_eq!(
+            get_app_name("/Applications/WebStorm.app/Contents/MacOS/webstorm"),
+            Some("WebStorm")
+        );
+        assert_eq!(
+            get_app_name("/Applications/GoLand.app/Contents/MacOS/goland"),
+            Some("GoLand")
+        );
+        assert_eq!(
+            get_app_name("/Applications/CLion.app/Contents/MacOS/clion"),
+            Some("CLion")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Rider.app/Contents/MacOS/rider"),
+            Some("Rider")
+        );
+        assert_eq!(
+            get_app_name("/Applications/RubyMine.app/Contents/MacOS/rubymine"),
+            Some("RubyMine")
+        );
+        assert_eq!(
+            get_app_name("/Applications/DataGrip.app/Contents/MacOS/datagrip"),
+            Some("DataGrip")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Android Studio.app/Contents/MacOS/studio"),
+            Some("Android Studio")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Aqua.app/Contents/MacOS/aqua"),
+            Some("Aqua")
+        );
+        assert_eq!(
+            get_app_name("/Applications/Fleet.app/Contents/MacOS/fleet"),
+            Some("Fleet")
+        );
+        assert_eq!(
+            get_app_name("/Applications/RustRover.app/Contents/MacOS/rustrover"),
+            Some("RustRover")
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_app_name_ce_ordering_guard() {
+        // Without this ordering guard, a path containing "IntelliJ IDEA CE.app"
+        // would match the "intellij idea.app" check first (since CE path is a superset),
+        // incorrectly returning "IntelliJ IDEA" instead of "IntelliJ IDEA CE".
+        assert_eq!(
+            get_app_name("/Applications/IntelliJ IDEA CE.app/Contents/MacOS/idea"),
+            Some("IntelliJ IDEA CE")
+        );
+        assert_eq!(
+            get_app_name("/Applications/IntelliJ IDEA.app/Contents/MacOS/idea"),
+            Some("IntelliJ IDEA")
+        );
+        assert_eq!(
+            get_app_name("/Applications/PyCharm CE.app/Contents/MacOS/pycharm"),
+            Some("PyCharm CE")
+        );
+        assert_eq!(
+            get_app_name("/Applications/PyCharm.app/Contents/MacOS/pycharm"),
+            Some("PyCharm")
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_app_name_iterm_server_process() {
+        assert_eq!(
+            get_app_name("/Users/user/Library/Application Support/iTerm2/iTermServer-3.6.6"),
+            Some("iTerm")
+        );
+        assert_eq!(
+            get_app_name("iTermServer-3.5.0"),
+            Some("iTerm")
+        );
     }
 }
