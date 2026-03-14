@@ -81,6 +81,18 @@ A quick-glance overlay showing all active sessions and their status directly fro
 
 ![Tray popover](docs/screenshots/tray-popover.jpeg)
 
+### Memory -- browse Claude Code memory files
+
+View and inspect all Claude Code memory files in a two-panel layout with quick access to Claude commands.
+
+![Memory tab](docs/screenshots/memory-tab.png)
+
+### Token distance -- visualize your usage
+
+See your total token usage as a rice stack towering past real-world landmarks. Share the result as an Instagram-ready PNG.
+
+![Token distance visualizer](docs/screenshots/token-distance-visualizer.png)
+
 ## Features
 
 - **Zero-integration setup** -- Works with any terminal or IDE, no plugins or extensions required
@@ -93,7 +105,10 @@ A quick-glance overlay showing all active sessions and their status directly fro
 - **Status notifications** -- Get a native macOS notification when a session needs your attention
 - **Mobile/Web client** -- Connect from any browser or mobile device via WebSocket; scan the QR code to monitor sessions remotely
 - **Session history** -- Browse and search all past sessions with instant metadata filter and deep content search; click a result to scroll to and highlight the matching message
+- **Memory viewer** -- Browse and inspect Claude Code memory files with a two-panel layout and quick Claude command access
 - **Cost tracker** -- Track Claude Code spending with daily, per-project, and per-model breakdowns using cached JSONL scanning
+- **Token distance visualizer** -- See your token usage as a rice stack towering past 17 real-world landmarks, with animated stacking, native share sheet, and Instagram-ready PNG export
+- **Debug console** -- Hidden diagnostic panel (`Cmd+Shift+D`) for troubleshooting session detection issues
 
 ## How it works
 
@@ -190,6 +205,7 @@ Thanks to these wonderful people who have contributed to c9watch:
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/cynaptic"><img src="https://github.com/cynaptic.png?s=100" width="100px;" alt="Ray Lee"/><br /><sub><b>Ray Lee</b></sub></a><br /><a href="#code-cynaptic" title="Code">💻</a> <a href="#platform-cynaptic" title="Platform">📦</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/grimmerk"><img src="https://github.com/grimmerk.png?s=100" width="100px;" alt="Grimmer Kang"/><br /><sub><b>Grimmer Kang</b></sub></a><br /><a href="#code-grimmerk" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/stanimir93"><img src="https://github.com/stanimir93.png?s=100" width="100px;" alt="Stanimir"/><br /><sub><b>Stanimir</b></sub></a><br /><a href="#code-stanimir93" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/josh-dev-cho"><img src="https://github.com/josh-dev-cho.png?s=100" width="100px;" alt="josh.dev"/><br /><sub><b>josh.dev</b></sub></a><br /><a href="#code-josh-dev-cho" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
