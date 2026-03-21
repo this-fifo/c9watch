@@ -217,6 +217,37 @@ fn is_file_recently_modified(path: &Path, seconds: u64) -> bool {
         .unwrap_or(false)
 }
 
+/// Cache for native custom titles, keyed by file path.
+/// Stores (mtime_as_nanos, cached_title) to avoid re-scanning JSONL files every poll cycle.
+use std::sync::LazyLock;
+static NATIVE_TITLE_CACHE: LazyLock<Mutex<HashMap<std::path::PathBuf, (u64, Option<String>)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Look up the native custom title for a session JSONL, using a mtime-based cache.
+fn get_cached_native_title(path: &Path) -> Option<String> {
+    let mtime = std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+
+    if let Ok(mut cache) = NATIVE_TITLE_CACHE.lock() {
+        if let Some((cached_mtime, cached_title)) = cache.get(path) {
+            if *cached_mtime == mtime {
+                return cached_title.clone();
+            }
+        }
+        // Cache miss or stale — re-scan
+        let title = crate::session::parser::get_native_custom_title_from_file(path);
+        cache.insert(path.to_path_buf(), (mtime, title.clone()));
+        title
+    } else {
+        // Mutex poisoned — fallback to direct read
+        crate::session::parser::get_native_custom_title_from_file(path)
+    }
+}
+
 /// Detect sessions and enrich them with status and conversation data
 pub fn detect_and_enrich_sessions() -> Result<(Vec<Session>, crate::session::DetectionDiagnostics), String> {
     let mut detector =
@@ -265,13 +296,24 @@ fn detect_and_enrich_sessions_with_detector(
         });
 
         let (first_prompt, summary, message_count, modified, git_branch) = match session_entry {
-            Some(entry) => (
-                entry.first_prompt.clone(),
-                entry.summary.clone(),
-                entry.message_count,
-                entry.modified.clone(),
-                Some(entry.git_branch.clone()),
-            ),
+            Some(entry) => {
+                // Guard: if sessions-index first_prompt is a system command, try JSONL fallback
+                let fp = if crate::session::parser::is_system_content(&entry.first_prompt) {
+                    let session_file_path =
+                        detected.project_path.join(format!("{}.jsonl", session_id));
+                    get_first_prompt_from_jsonl(&session_file_path)
+                        .unwrap_or_else(|| entry.first_prompt.clone())
+                } else {
+                    entry.first_prompt.clone()
+                };
+                (
+                    fp,
+                    entry.summary.clone(),
+                    entry.message_count,
+                    entry.modified.clone(),
+                    Some(entry.git_branch.clone()),
+                )
+            }
             None => {
                 // Session not in index or index doesn't exist - use fallback values
                 let session_file_path = detected.project_path.join(format!("{}.jsonl", session_id));
@@ -345,8 +387,11 @@ fn detect_and_enrich_sessions_with_detector(
             .cloned()
             .unwrap_or(detected.project_name);
 
-        // Get custom title if available
-        let custom_title = custom_titles.get(&session_id).cloned();
+        // Get custom title: Claude Code native /rename takes priority over c9watch's own.
+        // Uses a static cache keyed by (path, mtime) to avoid re-scanning the JSONL every cycle.
+        let native_title = get_cached_native_title(&session_file_path);
+        let custom_title =
+            native_title.or_else(|| custom_titles.get(&session_id).cloned());
 
         sessions.push(Session {
             id: session_id,
@@ -381,7 +426,11 @@ fn get_first_prompt_from_jsonl(path: &Path) -> Option<String> {
                 if let Some(message) = value.get("message") {
                     if let Some(content) = message.get("content") {
                         // Content can be a string or array
+                        // Skip system-generated local command messages
                         if let Some(text) = content.as_str() {
+                            if crate::session::parser::is_system_content(text) {
+                                continue;
+                            }
                             return Some(truncate_string(text, 100));
                         } else if let Some(arr) = content.as_array() {
                             // Find the first text block
@@ -423,8 +472,10 @@ fn get_latest_message_from_entries(entries: &[crate::session::parser::SessionEnt
     for entry in entries.iter().rev() {
         match entry {
             crate::session::parser::SessionEntry::User { message, .. } => {
-                // Skip tool result entries - only show actual user prompts
-                if message.is_tool_result {
+                // Skip tool result entries and system-generated command messages
+                if message.is_tool_result
+                    || crate::session::parser::is_system_content(&message.content)
+                {
                     continue;
                 }
                 return truncate_string(&message.content, 200);
@@ -453,7 +504,8 @@ fn get_latest_message_from_entries(entries: &[crate::session::parser::SessionEnt
     String::new()
 }
 
-/// Count user/assistant messages in a JSONL file
+/// Count user/assistant messages in a JSONL file.
+/// Skips system-injected user messages (local commands, slash commands, etc.)
 fn count_messages_in_jsonl(path: &Path) -> u32 {
     let file = match File::open(path) {
         Ok(f) => f,
@@ -465,8 +517,24 @@ fn count_messages_in_jsonl(path: &Path) -> u32 {
     for line in reader.lines().map_while(Result::ok) {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) {
             if let Some(msg_type) = value.get("type").and_then(|t| t.as_str()) {
-                if msg_type == "user" || msg_type == "assistant" {
-                    count += 1;
+                match msg_type {
+                    "assistant" => count += 1,
+                    "user" => {
+                        // Skip system-injected user messages
+                        if let Some(content) = value
+                            .get("message")
+                            .and_then(|m| m.get("content"))
+                            .and_then(|c| c.as_str())
+                        {
+                            if !crate::session::parser::is_system_content(content) {
+                                count += 1;
+                            }
+                        } else {
+                            // Array content (tool results) — still count them
+                            count += 1;
+                        }
+                    }
+                    _ => {}
                 }
             }
         }

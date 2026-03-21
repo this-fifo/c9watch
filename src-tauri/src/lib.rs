@@ -216,6 +216,10 @@ async fn rename_session(
     session_id: String,
     new_name: String,
 ) -> Result<(), String> {
+    // Write to Claude Code's native JSONL format (primary)
+    write_native_custom_title(&session_id, &new_name);
+
+    // Also write to c9watch's own custom titles (fallback for history view)
     let mut custom_titles = session::CustomTitles::load();
     custom_titles.set(session_id, new_name);
     custom_titles.save()?;
@@ -224,6 +228,61 @@ async fn rename_session(
         let _ = app.emit("sessions-updated", &sessions);
     }
     Ok(())
+}
+
+/// Append a `custom-title` entry to the session's JSONL file in Claude Code's native format.
+/// This makes the rename visible to Claude Code itself (and persists across c9watch reinstalls).
+pub fn write_native_custom_title(session_id: &str, title: &str) {
+    use std::io::Write;
+
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return,
+    };
+    let projects_dir = home.join(".claude").join("projects");
+
+    // Search all project directories for the session JSONL
+    let entries = match std::fs::read_dir(&projects_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let jsonl_path = path.join(format!("{}.jsonl", session_id));
+        if jsonl_path.exists() {
+            let entry = serde_json::json!({
+                "type": "custom-title",
+                "customTitle": title,
+                "sessionId": session_id,
+            });
+            match std::fs::OpenOptions::new().append(true).open(&jsonl_path) {
+                Ok(mut file) => {
+                    if let Err(e) = writeln!(file, "{}", entry) {
+                        debug_log::log_warn(&format!(
+                            "Failed to write native custom-title for {}: {}",
+                            session_id, e
+                        ));
+                    }
+                }
+                Err(e) => {
+                    debug_log::log_warn(&format!(
+                        "Failed to open JSONL for native custom-title {}: {}",
+                        session_id, e
+                    ));
+                }
+            }
+            return;
+        }
+    }
+
+    debug_log::log_warn(&format!(
+        "Could not find JSONL file for session {} to write native custom-title",
+        session_id
+    ));
 }
 
 /// Get the terminal title for a session (iTerm2 only, macOS)
