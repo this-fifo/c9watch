@@ -10,6 +10,8 @@ pub mod auth;
 #[cfg(not(mobile))]
 pub mod polling;
 #[cfg(not(mobile))]
+pub mod tray;
+#[cfg(not(mobile))]
 pub mod web_server;
 #[cfg(not(mobile))]
 pub mod debug_log;
@@ -422,6 +424,9 @@ pub fn run() {
             });
             tauri::async_runtime::spawn(web_server::start_server(ws_state));
 
+            // ── Tray icon variants ───────────────────────────────
+            app.manage(tray::TrayIcons::new());
+
             // ── Polling loop ────────────────────────────────────
             start_polling(app.handle().clone(), sessions_tx, notifications_tx);
 
@@ -485,7 +490,7 @@ pub fn run() {
 
             // ── Tray icon ───────────────────────────────────────
             let app_handle = app.handle().clone();
-            TrayIconBuilder::new()
+            TrayIconBuilder::with_id(tray::TRAY_ID)
                 .icon(tauri::include_image!("icons/tray-icon.png"))
                 .icon_as_template(true)
                 .tooltip("c9watch")

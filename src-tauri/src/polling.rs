@@ -4,6 +4,7 @@ use crate::session::{
 };
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use tauri::Manager;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -169,6 +170,34 @@ pub fn start_polling(
                     // Broadcast to WebSocket clients
                     if let Ok(json) = serde_json::to_string(&sessions) {
                         let _ = sessions_tx.send(json);
+                    }
+
+                    // Update tray icon and tooltip
+                    {
+                        use crate::session::SessionStatus as SS;
+                        use crate::tray::{TrayStatus, update_tray};
+
+                        let attention = sessions.iter().filter(|s| s.status == SS::NeedsAttention).count();
+                        let idle = sessions.iter().filter(|s| s.status == SS::WaitingForInput).count();
+                        let working = sessions.iter().filter(|s| s.status == SS::Working || s.status == SS::Connecting).count();
+                        let total = sessions.len();
+
+                        let (status, tooltip) = if total == 0 {
+                            (TrayStatus::NoSessions, "c9watch".to_string())
+                        } else if attention > 0 {
+                            let mut parts = vec![format!("{attention} need{} attention", if attention == 1 { "s" } else { "" })];
+                            if working > 0 { parts.push(format!("{working} working")); }
+                            if idle > 0 { parts.push(format!("{idle} idle")); }
+                            (TrayStatus::NeedsAttention, format!("c9watch — {}", parts.join(", ")))
+                        } else {
+                            let mut parts = Vec::new();
+                            if working > 0 { parts.push(format!("{working} working")); }
+                            if idle > 0 { parts.push(format!("{idle} idle")); }
+                            (TrayStatus::Active, format!("c9watch — {}", parts.join(", ")))
+                        };
+
+                        let icons = app_handle.state::<crate::tray::TrayIcons>();
+                        update_tray(app_handle.as_ref(), &icons, status, &tooltip);
                     }
 
                     // Emit diagnostics only when changed
