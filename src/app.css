@@ -3,60 +3,84 @@
  * True black, sharp edges, high contrast hardware interface
  */
 
-/* Geist Font Family from Vercel */
+/* Proza Libre - Sans-serif */
 @font-face {
-	font-family: 'Geist';
-	src: url('/fonts/Geist-Variable.woff2') format('woff2');
-	font-weight: 100 900;
+	font-family: 'Proza Libre';
+	src: url('/fonts/ProzaLibre-Regular.woff2') format('woff2');
+	font-weight: 400;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
-	font-family: 'Geist Mono';
-	src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
-	font-weight: 100 900;
-	font-style: normal;
-	font-display: swap;
-}
-
-/* Geist Pixel Fonts - Decorative display fonts */
-@font-face {
-	font-family: 'Geist Pixel Square';
-	src: url('/fonts/GeistPixel-Square.woff2') format('woff2');
+	font-family: 'Proza Libre';
+	src: url('/fonts/ProzaLibre-Medium.woff2') format('woff2');
 	font-weight: 500;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
-	font-family: 'Geist Pixel Grid';
-	src: url('/fonts/GeistPixel-Grid.woff2') format('woff2');
+	font-family: 'Proza Libre';
+	src: url('/fonts/ProzaLibre-SemiBold.woff2') format('woff2');
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Proza Libre';
+	src: url('/fonts/ProzaLibre-Bold.woff2') format('woff2');
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Proza Libre';
+	src: url('/fonts/ProzaLibre-ExtraBold.woff2') format('woff2');
+	font-weight: 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+/* Monaspace Neon - Monospace */
+@font-face {
+	font-family: 'Monaspace Neon';
+	src: url('/fonts/MonaspaceNeon-Light.woff2') format('woff2');
+	font-weight: 300;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Monaspace Neon';
+	src: url('/fonts/MonaspaceNeon-Regular.woff2') format('woff2');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Monaspace Neon';
+	src: url('/fonts/MonaspaceNeon-Medium.woff2') format('woff2');
 	font-weight: 500;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
-	font-family: 'Geist Pixel Circle';
-	src: url('/fonts/GeistPixel-Circle.woff2') format('woff2');
-	font-weight: 500;
+	font-family: 'Monaspace Neon';
+	src: url('/fonts/MonaspaceNeon-SemiBold.woff2') format('woff2');
+	font-weight: 600;
 	font-style: normal;
 	font-display: swap;
 }
 
 @font-face {
-	font-family: 'Geist Pixel Triangle';
-	src: url('/fonts/GeistPixel-Triangle.woff2') format('woff2');
-	font-weight: 500;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'Geist Pixel Line';
-	src: url('/fonts/GeistPixel-Line.woff2') format('woff2');
-	font-weight: 500;
+	font-family: 'Monaspace Neon';
+	src: url('/fonts/MonaspaceNeon-Bold.woff2') format('woff2');
+	font-weight: 700;
 	font-style: normal;
 	font-display: swap;
 }
@@ -125,10 +149,10 @@
 	--shadow-glow-green: 0 0 20px var(--status-input-glow);
 
 	/* Typography */
-	--font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-	--font-mono: 'Geist Mono', 'SF Mono', Monaco, monospace;
-	--font-pixel: 'Geist Pixel Square', var(--font-mono);
-	--font-pixel-grid: 'Geist Pixel Grid', var(--font-mono);
+	--font-sans: 'Proza Libre', -apple-system, BlinkMacSystemFont, sans-serif;
+	--font-mono: 'Monaspace Neon', 'SF Mono', Monaco, monospace;
+	--font-pixel: var(--font-sans);
+	--font-pixel-grid: var(--font-sans);
 
 	/* Transitions */
 	--transition-fast: 100ms linear;

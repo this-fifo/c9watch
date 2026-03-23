@@ -37,8 +37,8 @@
 	const BG = '#000000';
 
 	// Font families matching CSS design tokens
-	const FONT_PIXEL = "'Geist Pixel Square', 'Geist Mono', 'SF Mono', Monaco, monospace";
-	const FONT_MONO = "'Geist Mono', 'SF Mono', Monaco, monospace";
+	const FONT_PIXEL = "'Proza Libre', -apple-system, BlinkMacSystemFont, sans-serif";
+	const FONT_MONO = "'Monaspace Neon', 'SF Mono', Monaco, monospace";
 
 	// ── Formatting ───────────────────────────────────────────────
 	function formatTokenCount(n: number): string {
