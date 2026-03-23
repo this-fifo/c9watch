@@ -33,9 +33,43 @@ pub fn get_tailscale_hostname() -> Option<String> {
     }
 }
 
+/// Generate or refresh Tailscale HTTPS certificates (Let's Encrypt via `tailscale cert`).
+/// Returns (cert_path, key_path) on success, or None if certs can't be generated.
+pub fn get_tailscale_certs(hostname: &str) -> Option<(std::path::PathBuf, std::path::PathBuf)> {
+    let cache_dir = dirs::cache_dir()?.join("c9watch");
+    std::fs::create_dir_all(&cache_dir).ok()?;
+
+    let cert_path = cache_dir.join("tailscale.crt");
+    let key_path = cache_dir.join("tailscale.key");
+
+    let output = Command::new("tailscale")
+        .args([
+            "cert",
+            "--cert-file",
+            cert_path.to_str()?,
+            "--key-file",
+            key_path.to_str()?,
+            hostname,
+        ])
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        Some((cert_path, key_path))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        crate::debug_log::log_warn(&format!(
+            "[auth] tailscale cert failed: {}",
+            stderr.trim()
+        ));
+        None
+    }
+}
+
 /// Check if an IP address belongs to the Tailscale network.
 ///   IPv4: 100.64.0.0/10 (CGNAT range)
 ///   IPv6: fd7a:115c:a1e0::/48
+///   IPv4-mapped IPv6 (::ffff:100.x.x.x): produced by macOS dual-stack sockets
 pub fn is_tailscale_ip(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
@@ -43,6 +77,14 @@ pub fn is_tailscale_ip(ip: &IpAddr) -> bool {
             octets[0] == 100 && (octets[1] & 0xC0) == 64
         }
         IpAddr::V6(v6) => {
+            // On macOS, binding to [::] creates a dual-stack socket. IPv4 clients
+            // (including Tailscale 100.x.x.x peers) arrive as IPv4-mapped IPv6
+            // addresses (::ffff:100.x.x.x). Unwrap those and check the IPv4 range.
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                let octets = v4.octets();
+                return octets[0] == 100 && (octets[1] & 0xC0) == 64;
+            }
+            // Native Tailscale IPv6 range (fd7a:115c:a1e0::/48)
             let segments = v6.segments();
             segments[0] == 0xfd7a && segments[1] == 0x115c && segments[2] == 0xa1e0
         }
@@ -106,5 +148,25 @@ mod tests {
         use std::net::SocketAddr;
         let ts: SocketAddr = "100.100.50.1:12345".parse().unwrap();
         assert!(is_allowed_ip(&ts));
+    }
+
+    #[test]
+    fn test_ipv4_mapped_tailscale_allowed() {
+        // macOS dual-stack socket presents IPv4 clients as ::ffff:a.b.c.d
+        use std::net::{Ipv6Addr, SocketAddr};
+        // ::ffff:100.100.50.1
+        let mapped = Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0x6464, 0x3201);
+        assert!(is_tailscale_ip(&IpAddr::V6(mapped)));
+
+        let sa = SocketAddr::new(IpAddr::V6(mapped), 9210);
+        assert!(is_allowed_ip(&sa));
+    }
+
+    #[test]
+    fn test_ipv4_mapped_non_tailscale_denied() {
+        use std::net::Ipv6Addr;
+        // ::ffff:192.168.1.50
+        let mapped = Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc0a8, 0x0132);
+        assert!(!is_tailscale_ip(&IpAddr::V6(mapped)));
     }
 }
