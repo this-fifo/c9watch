@@ -10,14 +10,15 @@
 	let pageUrl = $state('');
 	let error = $state<string>('');
 	let copied = $state(false);
-	let copiedToken = $state(false);
 
 	onMount(async () => {
 		try {
 			info = await getServerInfo();
-			// QR encodes an HTTP URL so phone camera opens the browser directly
-			// In production, the axum server on port 9210 serves the frontend files
-			pageUrl = `http://${info.localIp}:${info.port}/?token=${info.token}`;
+			if (info.tailscaleHostname) {
+				pageUrl = `http://${info.tailscaleHostname}:${info.port}/`;
+			} else {
+				pageUrl = `http://${info.localIp}:${info.port}/`;
+			}
 			qrDataUrl = await QRCode.toDataURL(pageUrl, {
 				width: 256,
 				margin: 2,
@@ -28,28 +29,10 @@
 		}
 	});
 
-	async function copyToken() {
-		if (!info) return;
-		try {
-			await navigator.clipboard.writeText(info.token);
-		} catch {
-			const el = document.createElement('textarea');
-			el.value = info.token;
-			document.body.appendChild(el);
-			el.select();
-			document.execCommand('copy');
-			document.body.removeChild(el);
-		}
-		copiedToken = true;
-		setTimeout(() => (copiedToken = false), 2000);
-	}
-
 	async function copyUrl() {
 		if (!pageUrl) return;
 		try {
 			await navigator.clipboard.writeText(pageUrl);
-			copied = true;
-			setTimeout(() => (copied = false), 2000);
 		} catch {
 			const el = document.createElement('textarea');
 			el.value = pageUrl;
@@ -57,9 +40,9 @@
 			el.select();
 			document.execCommand('copy');
 			document.body.removeChild(el);
-			copied = true;
-			setTimeout(() => (copied = false), 2000);
 		}
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
 	}
 
 	function handleBackdrop(e: MouseEvent) {
@@ -91,29 +74,41 @@
 		{:else if !info}
 			<div class="loading">Loading server info...</div>
 		{:else}
-			<div class="qr-container">
-				<img src={qrDataUrl} alt="QR Code" class="qr-image" />
-			</div>
+			{#if info.tailscaleHostname}
+				<div class="qr-container">
+					<img src={qrDataUrl} alt="QR Code" class="qr-image" />
+				</div>
 
-			<div class="info-section">
-				<span class="info-label">Token</span>
-				<button class="url-box token-box" onclick={copyToken} title="Click to copy token">
-					<code class="token-text">{info.token}</code>
-					<span class="copy-hint">{copiedToken ? 'COPIED' : 'COPY'}</span>
-				</button>
-			</div>
+				<div class="info-section">
+					<span class="info-label">URL</span>
+					<button class="url-box" onclick={copyUrl} title="Click to copy">
+						<code class="url-text">{pageUrl}</code>
+						<span class="copy-hint">{copied ? 'COPIED' : 'COPY'}</span>
+					</button>
+				</div>
 
-			<div class="info-section">
-				<span class="info-label">Full URL</span>
-				<button class="url-box" onclick={copyUrl} title="Click to copy">
-					<code class="url-text">{pageUrl}</code>
-					<span class="copy-hint">{copied ? 'COPIED' : 'COPY'}</span>
-				</button>
-			</div>
+				<div class="instructions">
+					<p>Scan QR with phone camera to open in browser. Both devices must be on your Tailscale network.</p>
+				</div>
+			{:else}
+				<div class="no-tailscale">
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10" />
+						<line x1="12" y1="8" x2="12" y2="12" />
+						<line x1="12" y1="16" x2="12.01" y2="16" />
+					</svg>
+					<p>Tailscale not detected</p>
+					<p class="no-tailscale-detail">Remote access requires Tailscale to be running. Start Tailscale and relaunch c9watch to enable mobile access.</p>
+				</div>
 
-			<div class="instructions">
-				<p>Scan QR with phone camera to open in browser, or enter the token manually on the mobile connection screen.</p>
-			</div>
+				<div class="info-section">
+					<span class="info-label">Local URL (same machine only)</span>
+					<button class="url-box" onclick={copyUrl} title="Click to copy">
+						<code class="url-text">{pageUrl}</code>
+						<span class="copy-hint">{copied ? 'COPIED' : 'COPY'}</span>
+					</button>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>
@@ -220,18 +215,6 @@
 		border-color: var(--text-muted);
 	}
 
-	.token-box {
-		background: rgba(255, 255, 255, 0.05);
-	}
-
-	.token-text {
-		font-family: var(--font-mono);
-		font-size: 14px;
-		color: var(--text-primary);
-		letter-spacing: 0.05em;
-		word-break: break-all;
-	}
-
 	.url-text {
 		font-family: var(--font-mono);
 		font-size: 12px;
@@ -245,6 +228,33 @@
 		color: var(--accent-green);
 		letter-spacing: 0.1em;
 		flex-shrink: 0;
+	}
+
+	.no-tailscale {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-sm);
+		padding: var(--space-xl) 0;
+		color: var(--text-muted);
+	}
+
+	.no-tailscale p {
+		font-family: var(--font-mono);
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.no-tailscale-detail {
+		font-size: 12px !important;
+		font-weight: 400 !important;
+		text-transform: none !important;
+		letter-spacing: normal !important;
+		text-align: center;
+		line-height: 1.5;
 	}
 
 	.instructions {

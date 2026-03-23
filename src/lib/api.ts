@@ -79,10 +79,10 @@ export async function renameSession(sessionId: string, newName: string): Promise
  * Server connection info (desktop/Tauri only)
  */
 export interface ServerInfo {
-	token: string;
 	port: number;
 	localIp: string;
 	wsUrl: string;
+	tailscaleHostname: string | null;
 }
 
 export async function getServerInfo(): Promise<ServerInfo> {

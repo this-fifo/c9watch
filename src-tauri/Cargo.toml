@@ -21,7 +21,6 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-sharekit = "0.3"
 serde = { version = "1", features = ["derive"] }
@@ -34,8 +33,6 @@ chrono = "0.4"
 libc = "0.2.180"
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync"] }
-rand = "0.8"
-qr2term = "0.3"
 rust-embed = "8"
 mime_guess = "2"
 base64 = "0.22"

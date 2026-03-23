@@ -1,7 +1,7 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Query, State,
+        ConnectInfo, State,
     },
     http::{header, StatusCode},
     response::IntoResponse,
@@ -23,7 +23,6 @@ pub const WS_PORT: u16 = 9210;
 
 /// Shared state for the WebSocket server
 pub struct WsState {
-    pub auth_token: String,
     pub sessions_tx: broadcast::Sender<String>,
     pub notifications_tx: broadcast::Sender<String>,
 }
@@ -108,7 +107,12 @@ pub async fn start_server(state: Arc<WsState>) {
 
     match tokio::net::TcpListener::bind(&addr).await {
         Ok(listener) => {
-            if let Err(e) = axum::serve(listener, app).await {
+            if let Err(e) = axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .await
+            {
                 crate::debug_log::log_error(&format!("[ws-server] Error: {}", e));
             }
         }
@@ -167,26 +171,21 @@ fn serve_embedded_file(path: &str) -> impl IntoResponse {
 
 // ── WebSocket handler ───────────────────────────────────────────────
 
-#[derive(Deserialize)]
-struct WsQuery {
-    token: Option<String>,
-}
-
 async fn ws_handler(
     ws: WebSocketUpgrade,
-    Query(params): Query<WsQuery>,
+    ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
     State(state): State<Arc<WsState>>,
 ) -> axum::response::Response {
-    match &params.token {
-        Some(token) if token == &state.auth_token => ws
-            .on_upgrade(move |socket| handle_socket(socket, state))
-            .into_response(),
-        _ => (
-            axum::http::StatusCode::UNAUTHORIZED,
-            "Invalid or missing token",
-        )
-            .into_response(),
+    if !crate::auth::is_allowed_ip(&addr) {
+        crate::debug_log::log_warn(&format!(
+            "[ws-server] Rejected connection from non-tailscale IP: {}",
+            addr
+        ));
+        return (StatusCode::FORBIDDEN, "Access denied: only localhost and Tailscale IPs allowed")
+            .into_response();
     }
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
+        .into_response()
 }
 
 async fn handle_socket(mut socket: WebSocket, state: Arc<WsState>) {

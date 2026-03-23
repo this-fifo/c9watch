@@ -324,20 +324,20 @@ async fn show_main_window(app: AppHandle) -> Result<(), String> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerInfo {
-    pub token: String,
     pub port: u16,
     pub local_ip: String,
     pub ws_url: String,
+    pub tailscale_hostname: Option<String>,
 }
 
 #[cfg(not(mobile))]
 #[tauri::command]
 async fn get_server_info(info: tauri::State<'_, ServerInfo>) -> Result<ServerInfo, String> {
     Ok(ServerInfo {
-        token: info.token.clone(),
         port: info.port,
         local_ip: info.local_ip.clone(),
         ws_url: info.ws_url.clone(),
+        tailscale_hostname: info.tailscale_hostname.clone(),
     })
 }
 
@@ -371,7 +371,6 @@ pub fn run() {
     // Desktop: full setup with all plugins and commands
     #[cfg(not(mobile))]
     let builder = builder
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_sharekit::init());
@@ -384,30 +383,36 @@ pub fn run() {
     let builder = builder
         .setup(|app| {
             // ── WebSocket server ────────────────────────────────
-            let token = auth::generate_token();
             let local_ip = auth::get_local_ip();
+            let tailscale_hostname = auth::get_tailscale_hostname();
             let port = web_server::WS_PORT;
 
-            let ws_url = format!("ws://{}:{}/ws?token={}", local_ip, port, token);
-            let http_url = format!("http://{}:{}/?token={}", local_ip, port, token);
+            let ws_url = if let Some(ref ts_host) = tailscale_hostname {
+                format!("ws://{}:{}/ws", ts_host, port)
+            } else {
+                format!("ws://{}:{}/ws", local_ip, port)
+            };
 
-            debug_log::log_info(&format!("Mobile connection ready — URL: {}", http_url));
-            qr2term::print_qr(&http_url).ok();
-            eprintln!();
+            let display_url = if let Some(ref ts_host) = tailscale_hostname {
+                format!("http://{}:{}/", ts_host, port)
+            } else {
+                format!("http://{}:{}/", local_ip, port)
+            };
+
+            debug_log::log_info(&format!("Remote access: {}", display_url));
 
             let (sessions_tx, _rx) = tokio::sync::broadcast::channel::<String>(16);
             let (notifications_tx, _nrx) = tokio::sync::broadcast::channel::<String>(16);
 
             let server_info = ServerInfo {
-                token: token.clone(),
                 port,
                 local_ip: local_ip.clone(),
                 ws_url,
+                tailscale_hostname,
             };
             app.manage(server_info);
 
             let ws_state = Arc::new(web_server::WsState {
-                auth_token: token,
                 sessions_tx: sessions_tx.clone(),
                 notifications_tx: notifications_tx.clone(),
             });
