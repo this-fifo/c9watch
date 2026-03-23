@@ -92,8 +92,12 @@ enum ServerMsg {
 
 // ── Server entrypoint ───────────────────────────────────────────────
 
-/// Start the axum WebSocket server (call from tauri::async_runtime::spawn)
-pub async fn start_server(state: Arc<WsState>) {
+/// Start the axum WebSocket server (call from tauri::async_runtime::spawn).
+/// When `tls_cert_paths` is provided, serves HTTPS/WSS; otherwise plain HTTP/WS.
+pub async fn start_server(
+    state: Arc<WsState>,
+    tls_cert_paths: Option<(std::path::PathBuf, std::path::PathBuf)>,
+) {
     let app = Router::new()
         .route("/ws", get(ws_handler))
         .route("/health", get(health))
@@ -101,11 +105,36 @@ pub async fn start_server(state: Arc<WsState>) {
         .fallback(get(serve_static_fallback))
         .with_state(state);
 
-    // [::] accepts both IPv4 and IPv6 (localhost can resolve to ::1)
-    let addr = format!("[::]:{}", WS_PORT);
-    crate::debug_log::log_info(&format!("[ws-server] Listening on {}", addr));
+    let addr: std::net::SocketAddr = format!("[::]:{}", WS_PORT).parse().unwrap();
 
-    match tokio::net::TcpListener::bind(&addr).await {
+    // Try HTTPS if Tailscale certs are available
+    if let Some((cert_path, key_path)) = tls_cert_paths {
+        match axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_path, &key_path).await {
+            Ok(tls_config) => {
+                crate::debug_log::log_info(&format!(
+                    "[ws-server] Listening on {} (HTTPS/WSS)",
+                    addr
+                ));
+                if let Err(e) = axum_server::bind_rustls(addr, tls_config)
+                    .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+                    .await
+                {
+                    crate::debug_log::log_error(&format!("[ws-server] HTTPS error: {}", e));
+                }
+                return;
+            }
+            Err(e) => {
+                crate::debug_log::log_error(&format!(
+                    "[ws-server] TLS config failed: {}. Falling back to HTTP.",
+                    e
+                ));
+            }
+        }
+    }
+
+    // HTTP fallback
+    crate::debug_log::log_info(&format!("[ws-server] Listening on {} (HTTP/WS)", addr));
+    match tokio::net::TcpListener::bind(addr).await {
         Ok(listener) => {
             if let Err(e) = axum::serve(
                 listener,
@@ -250,12 +279,17 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<WsState>) {
 
 async fn handle_message(msg: ClientMsg) -> ServerMsg {
     match msg {
-        ClientMsg::GetSessions => match crate::polling::detect_and_enrich_sessions() {
-            Ok(sessions) => ServerMsg::Sessions {
-                data: serde_json::to_value(&sessions).unwrap_or_default(),
-            },
-            Err(e) => ServerMsg::Error { message: e },
-        },
+        ClientMsg::GetSessions => {
+            match tokio::task::spawn_blocking(crate::polling::detect_and_enrich_sessions).await {
+                Ok(Ok((sessions, _diagnostics))) => ServerMsg::Sessions {
+                    data: serde_json::to_value(&sessions).unwrap_or_default(),
+                },
+                Ok(Err(e)) => ServerMsg::Error { message: e },
+                Err(e) => ServerMsg::Error {
+                    message: format!("Detection task failed: {}", e),
+                },
+            }
+        }
 
         ClientMsg::GetConversation { session_id } => {
             match crate::get_conversation_data(&session_id) {
