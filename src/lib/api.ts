@@ -4,18 +4,13 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { get } from 'svelte/store';
 import type { Session, Conversation, HistoryEntry, DeepSearchHit, CostData, ProjectMemory, LogEntry } from './types';
-import { isDemoMode } from './demo/mode';
-import { getDemoSessions, demoConversations } from './demo/data';
 import { wsClient, useWebSocket } from './ws';
 
 /**
  * Get all active Claude Code sessions
  */
 export async function getSessions(): Promise<Session[]> {
-	if (get(isDemoMode)) return getDemoSessions();
-
 	if (useWebSocket()) {
 		return await wsClient.request<Session[]>('getSessions');
 	}
@@ -26,10 +21,6 @@ export async function getSessions(): Promise<Session[]> {
  * Get the full conversation history for a specific session
  */
 export async function getConversation(sessionId: string): Promise<Conversation> {
-	if (get(isDemoMode)) {
-		return demoConversations[sessionId] ?? { sessionId, messages: [] };
-	}
-
 	if (useWebSocket()) {
 		return await wsClient.request<Conversation>('getConversation', { sessionId });
 	}
@@ -40,8 +31,6 @@ export async function getConversation(sessionId: string): Promise<Conversation> 
  * Stop a running session by sending SIGTERM
  */
 export async function stopSession(pid: number): Promise<void> {
-	if (get(isDemoMode)) return;
-
 	if (useWebSocket()) {
 		await wsClient.request('stopSession', { pid });
 		return;
@@ -53,8 +42,6 @@ export async function stopSession(pid: number): Promise<void> {
  * Open the terminal or IDE window for a session
  */
 export async function openSession(pid: number, projectPath: string): Promise<void> {
-	if (get(isDemoMode)) return;
-
 	if (useWebSocket()) {
 		await wsClient.request('openSession', { pid, projectPath });
 		return;
@@ -66,8 +53,6 @@ export async function openSession(pid: number, projectPath: string): Promise<voi
  * Rename a session title
  */
 export async function renameSession(sessionId: string, newName: string): Promise<void> {
-	if (get(isDemoMode)) return;
-
 	if (useWebSocket()) {
 		await wsClient.request('renameSession', { sessionId, newName });
 		return;
@@ -94,7 +79,6 @@ export async function getServerInfo(): Promise<ServerInfo> {
  * (Desktop/Tauri only — returns empty array on mobile/browser)
  */
 export async function getSessionHistory(): Promise<HistoryEntry[]> {
-	if (get(isDemoMode)) return [];
 	if (useWebSocket()) return [];
 	return await invoke<HistoryEntry[]>('get_session_history');
 }
@@ -105,7 +89,6 @@ export async function getSessionHistory(): Promise<HistoryEntry[]> {
  * (Desktop/Tauri only — returns empty array on mobile/browser)
  */
 export async function deepSearchSessions(query: string): Promise<DeepSearchHit[]> {
-	if (get(isDemoMode)) return [];
 	if (useWebSocket()) return [];
 	return await invoke<DeepSearchHit[]>('deep_search_sessions', { query });
 }
@@ -115,7 +98,6 @@ export async function deepSearchSessions(query: string): Promise<DeepSearchHit[]
  * (Desktop/Tauri only — returns null on mobile/browser)
  */
 export async function getCostData(): Promise<CostData | null> {
-	if (get(isDemoMode)) return null;
 	if (useWebSocket()) return null;
 	return await invoke<CostData>('get_cost_data');
 }
@@ -125,7 +107,6 @@ export async function getCostData(): Promise<CostData | null> {
  * (Desktop/Tauri only — returns empty array on mobile/browser)
  */
 export async function getMemoryFiles(): Promise<ProjectMemory[]> {
-	if (get(isDemoMode)) return [];
 	if (useWebSocket()) return [];
 	return await invoke<ProjectMemory[]>('get_memory_files');
 }
@@ -134,7 +115,6 @@ export async function getMemoryFiles(): Promise<ProjectMemory[]> {
  * Open a directory in the system file manager (Finder on macOS)
  */
 export async function revealInFileManager(path: string): Promise<void> {
-	if (get(isDemoMode)) return;
 	await invoke<void>('reveal_in_file_manager', { path });
 }
 

@@ -11,7 +11,6 @@
 		statusSummary
 	} from '$lib/stores/sessions';
 	import { getConversation, stopSession, openSession } from '$lib/api';
-	import { isDemoMode, toggleDemoMode } from '$lib/demo';
 	import { isTauri } from '$lib/ws';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import SessionCard from '$lib/components/SessionCard.svelte';
@@ -28,7 +27,6 @@
 	import DebugConsole from '$lib/components/DebugConsole.svelte';
 	import type { DetectionDiagnostics } from '$lib/types';
 
-	let demoActive = $derived($isDemoMode);
 	let showQRModal = $state(false);
 
 	let needsConnection = $state(!isTauri());
@@ -245,17 +243,10 @@
 		const tag = (e.target as HTMLElement)?.tagName;
 		if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-		// Cmd+Shift+D → debug console (check shift first to avoid triggering demo toggle)
-		// On macOS, e.key is lowercase 'd' even with Shift held when Cmd is pressed
+		// Cmd+Shift+D → debug console
 		if ((e.key === 'd' || e.key === 'D') && e.shiftKey && (e.metaKey || e.ctrlKey)) {
 			e.preventDefault();
 			showDebugConsole = !showDebugConsole;
-			return;
-		}
-
-		if (e.key === 'd' && (e.metaKey || e.ctrlKey)) {
-			e.preventDefault();
-			toggleDemoMode();
 			return;
 		}
 		if (e.key >= '1' && e.key <= '9' && !expandedId) {
@@ -349,20 +340,6 @@
 				<div class="project-header">
 					<span class="project-name">System status</span>
 					<span class="project-count">{sessions.length}</span>
-					<button
-						class="toggle-btn demo-toggle"
-						class:active={demoActive}
-						onclick={() => toggleDemoMode()}
-						title="Try with Sample Data (Cmd+D)"
-					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-							<path d="M10 2v7.31" />
-							<path d="M14 2v7.31" />
-							<path d="M8.5 2h7" />
-							<path d="M14 9.3c.7.4 1.3.9 1.8 1.5l3.8 4.4a3 3 0 0 1-2.3 4.8H6.7a3 3 0 0 1-2.3-4.8l3.8-4.4c.5-.6 1.1-1.1 1.8-1.5" />
-						</svg>
-						<span class="demo-label">DEMO</span>
-					</button>
 					{#if isTauri()}
 						<button
 							class="toggle-btn mobile-connect-btn"
@@ -1005,31 +982,6 @@
 		margin: 2px 4px;
 	}
 
-	.demo-toggle {
-		width: auto;
-		padding: 0 var(--space-sm);
-		gap: var(--space-xs);
-		color: var(--accent-amber);
-	}
-
-	.demo-toggle:hover {
-		color: var(--accent-amber);
-		background: rgba(255, 102, 0, 0.1);
-	}
-
-	.demo-toggle.active {
-		background: var(--accent-amber);
-		color: #000;
-		border-color: var(--accent-amber);
-	}
-
-	.demo-label {
-		font-family: var(--font-pixel);
-		font-size: 10px;
-		font-weight: 700;
-		letter-spacing: 0.05em;
-	}
-
 	.mobile-connect-btn {
 		width: auto;
 		padding: 0 var(--space-sm);
@@ -1047,19 +999,6 @@
 		font-size: 10px;
 		font-weight: 700;
 		letter-spacing: 0.05em;
-	}
-
-	.demo-badge {
-		font-family: var(--font-mono);
-		font-size: 10px;
-		font-weight: 700;
-		color: var(--accent-amber);
-		background: rgba(255, 102, 0, 0.12);
-		padding: 2px 6px;
-		border: 1px solid var(--accent-amber);
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		line-height: 1;
 	}
 
 	.empty-header-row {
@@ -1141,9 +1080,6 @@
 			height: 32px;
 		}
 
-		.demo-toggle {
-			padding: 0 var(--space-xs);
-		}
 	}
 
 	/* ── Rename Hint Modal ───────────────────────────────────────── */

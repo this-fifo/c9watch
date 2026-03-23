@@ -2,13 +2,11 @@
  * Svelte stores for session state management
  */
 
-import { writable, derived, get } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 import { listen } from '@tauri-apps/api/event';
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import type { Session, Conversation } from '../types';
 import { SessionStatus } from '../types';
-import { isDemoMode } from '../demo/mode';
-import { openSession } from '../api';
 import { wsClient, useWebSocket, getStoredWsUrl, isTauri } from '../ws';
 
 /**
@@ -146,13 +144,10 @@ async function initWebSocketListeners() {
 	}
 
 	wsClient.on('sessionsUpdated', (data: Session[]) => {
-		if (!get(isDemoMode)) {
-			sessions.set(data);
-		}
+		sessions.set(data);
 	});
 
 	wsClient.on('notification', (data: { title: string; body: string; sessionId: string; pid: number }) => {
-		if (get(isDemoMode)) return;
 		showInAppNotification(data.title, data.body);
 	});
 }
@@ -161,9 +156,7 @@ async function initWebSocketListeners() {
 
 async function initTauriListeners() {
 	await listen<Session[]>('sessions-updated', (event) => {
-		if (!get(isDemoMode)) {
-			sessions.set(event.payload);
-		}
+		sessions.set(event.payload);
 	});
 
 	await listen<Conversation>('conversation-updated', (event) => {
@@ -171,15 +164,13 @@ async function initTauriListeners() {
 	});
 
 	await listen<NotificationMetadata>('notification-fired', (event) => {
-		if (!get(isDemoMode)) {
-			const metadata = event.payload;
-			notificationMetadataMap.set(metadata.notificationId, metadata);
+		const metadata = event.payload;
+		notificationMetadataMap.set(metadata.notificationId, metadata);
 
-			while (notificationMetadataMap.size > MAX_NOTIFICATION_ENTRIES) {
-				const firstKey = notificationMetadataMap.keys().next().value;
-				if (firstKey !== undefined) {
-					notificationMetadataMap.delete(firstKey);
-				}
+		while (notificationMetadataMap.size > MAX_NOTIFICATION_ENTRIES) {
+			const firstKey = notificationMetadataMap.keys().next().value;
+			if (firstKey !== undefined) {
+				notificationMetadataMap.delete(firstKey);
 			}
 		}
 	});

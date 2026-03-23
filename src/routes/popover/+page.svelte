@@ -6,7 +6,6 @@
 	import type { Session } from '$lib/types';
 	import { invoke } from '@tauri-apps/api/core';
 	import { listen } from '@tauri-apps/api/event';
-	import { isDemoMode, loadDemoDataIfActive } from '$lib/demo';
 
 	let sessions = $derived($sortedSessions);
 	let summary = $derived($statusSummary);
@@ -64,28 +63,17 @@
 		let cancelled = false;
 
 		const init = async () => {
-			const demoActive = loadDemoDataIfActive();
 			await initializeSessionListeners();
 
-			if (!demoActive) {
-				try {
-					const initialSessions = await getSessions();
-					sessionsStore.set(initialSessions);
-				} catch (error) {
-					console.error('Failed to fetch sessions:', error);
-				}
+			try {
+				const initialSessions = await getSessions();
+				sessionsStore.set(initialSessions);
+			} catch (error) {
+				console.error('Failed to fetch sessions:', error);
 			}
 
 			const ul1 = await listen('tauri://focus', () => {
-				// Re-sync demo mode state on every focus — user may have toggled it
-				// in the main window since the last time this panel was shown.
-				const demo = loadDemoDataIfActive();
-				if (demo) return;
-
-				// Demo is off — ensure isDemoMode store is cleared.
-				// Don't fetch sessions independently; the poller is the single source
-				// of truth and will emit sessions-updated within 3.5s.
-				isDemoMode.set(false);
+				// No-op: sessions are refreshed by the poller via sessions-updated events
 			});
 
 			if (cancelled) {
