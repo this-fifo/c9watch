@@ -15,7 +15,8 @@
 		try {
 			info = await getServerInfo();
 			if (info.tailscaleHostname) {
-				pageUrl = `http://${info.tailscaleHostname}:${info.port}/`;
+				const scheme = info.tls ? 'https' : 'http';
+				pageUrl = `${scheme}://${info.tailscaleHostname}:${info.port}/`;
 			} else {
 				pageUrl = `http://${info.localIp}:${info.port}/`;
 			}

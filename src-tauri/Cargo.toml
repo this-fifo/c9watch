@@ -32,6 +32,7 @@ dirs = "5.0"
 chrono = "0.4"
 libc = "0.2.180"
 axum = { version = "0.7", features = ["ws"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "sync"] }
 rust-embed = "8"
 mime_guess = "2"

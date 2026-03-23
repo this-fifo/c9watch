@@ -68,6 +68,7 @@ export interface ServerInfo {
 	localIp: string;
 	wsUrl: string;
 	tailscaleHostname: string | null;
+	tls: boolean;
 }
 
 export async function getServerInfo(): Promise<ServerInfo> {

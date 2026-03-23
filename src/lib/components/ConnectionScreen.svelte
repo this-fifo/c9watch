@@ -46,8 +46,9 @@
 			}
 			wsUrl = trimmed;
 		} else {
-			// Treat as hostname (e.g. "macbook.tail1234.ts.net" or "192.168.1.50")
-			wsUrl = `ws://${trimmed}:${WS_PORT}/ws`;
+			// Use wss:// for Tailscale hostnames (they have valid Let's Encrypt certs)
+			const scheme = trimmed.endsWith('.ts.net') ? 'wss' : 'ws';
+			wsUrl = `${scheme}://${trimmed}:${WS_PORT}/ws`;
 		}
 		doConnect(wsUrl);
 	}
@@ -63,7 +64,9 @@
 		// Auto-connect if accessed via Tailscale MagicDNS hostname
 		const hostname = window.location.hostname;
 		if (hostname.endsWith('.ts.net')) {
-			doConnect(`ws://${hostname}:${WS_PORT}/ws`);
+			// Match the page protocol: https → wss, http → ws
+			const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+			doConnect(`${scheme}://${hostname}:${WS_PORT}/ws`);
 			return;
 		}
 

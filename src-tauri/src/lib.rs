@@ -330,6 +330,7 @@ pub struct ServerInfo {
     pub local_ip: String,
     pub ws_url: String,
     pub tailscale_hostname: Option<String>,
+    pub tls: bool,
 }
 
 #[cfg(not(mobile))]
@@ -340,6 +341,7 @@ async fn get_server_info(info: tauri::State<'_, ServerInfo>) -> Result<ServerInf
         local_ip: info.local_ip.clone(),
         ws_url: info.ws_url.clone(),
         tailscale_hostname: info.tailscale_hostname.clone(),
+        tls: info.tls,
     })
 }
 
@@ -393,14 +395,22 @@ pub fn run() {
             let tailscale_hostname = auth::get_tailscale_hostname();
             let port = web_server::WS_PORT;
 
+            // Try to get Tailscale HTTPS certs (Let's Encrypt via `tailscale cert`)
+            let tls_cert_paths = tailscale_hostname
+                .as_ref()
+                .and_then(|host| auth::get_tailscale_certs(host));
+            let use_tls = tls_cert_paths.is_some();
+
             let ws_url = if let Some(ref ts_host) = tailscale_hostname {
-                format!("ws://{}:{}/ws", ts_host, port)
+                let scheme = if use_tls { "wss" } else { "ws" };
+                format!("{}://{}:{}/ws", scheme, ts_host, port)
             } else {
                 format!("ws://{}:{}/ws", local_ip, port)
             };
 
             let display_url = if let Some(ref ts_host) = tailscale_hostname {
-                format!("http://{}:{}/", ts_host, port)
+                let scheme = if use_tls { "https" } else { "http" };
+                format!("{}://{}:{}/", scheme, ts_host, port)
             } else {
                 format!("http://{}:{}/", local_ip, port)
             };
@@ -415,6 +425,7 @@ pub fn run() {
                 local_ip: local_ip.clone(),
                 ws_url,
                 tailscale_hostname,
+                tls: use_tls,
             };
             app.manage(server_info);
 
@@ -422,7 +433,7 @@ pub fn run() {
                 sessions_tx: sessions_tx.clone(),
                 notifications_tx: notifications_tx.clone(),
             });
-            tauri::async_runtime::spawn(web_server::start_server(ws_state));
+            tauri::async_runtime::spawn(web_server::start_server(ws_state, tls_cert_paths));
 
             // ── Tray icon variants ───────────────────────────────
             app.manage(tray::TrayIcons::new());
