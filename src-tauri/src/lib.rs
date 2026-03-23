@@ -382,6 +382,10 @@ pub fn run() {
     #[cfg(not(mobile))]
     let builder = builder
         .setup(|app| {
+            // Hide dock icon — this is a menu bar (tray) app
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             // ── WebSocket server ────────────────────────────────
             let local_ip = auth::get_local_ip();
             let tailscale_hostname = auth::get_tailscale_hostname();
