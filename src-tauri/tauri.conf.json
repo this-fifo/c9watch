@@ -58,14 +58,6 @@
       "signingIdentity": "-",
       "entitlements": "entitlements.plist"
     },
-    "createUpdaterArtifacts": "v1Compatible"
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJCMUUxQThBMkYxNjIyMjgKUldRb0loWXZpaG9ldTRMSmFTdUsrUDMwdW90K1VMdVpkQVROTUZSMkVlUWVCb1hJdEtPVXp6VTMK",
-      "endpoints": [
-        "https://github.com/minchenlee/c9watch/releases/latest/download/latest.json"
-      ]
-    }
+    "createUpdaterArtifacts": false
   }
 }
