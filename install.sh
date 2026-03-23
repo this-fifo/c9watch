@@ -1,100 +1,63 @@
 #!/usr/bin/env bash
 #
-# c9watch installer
+# Build c9watch from source and install to /Applications
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/minchenlee/c9watch/main/install.sh | bash
-#
-# This script:
-#   1. Detects your Mac's architecture (Apple Silicon or Intel)
-#   2. Downloads the latest signed DMG from GitHub
-#   3. Installs c9watch.app to /Applications
+#   ./install.sh          # build + install + launch
+#   ./install.sh --no-open  # build + install without launching
 #
 set -euo pipefail
 
-REPO="minchenlee/c9watch"
 APP_NAME="c9watch"
 INSTALL_DIR="/Applications"
-
-# --- Helpers ---
+BUNDLE="src-tauri/target/release/bundle/macos/${APP_NAME}.app"
 
 info()  { printf '\033[1;34m=>\033[0m %s\n' "$*"; }
 error() { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
 
-# --- Detect architecture ---
+cd "$(dirname "$0")"
 
-ARCH=$(uname -m)
-case "$ARCH" in
-  arm64|aarch64) ARCH_LABEL="aarch64" ;;
-  x86_64)        ARCH_LABEL="x86_64" ;;
-  *)             error "Unsupported architecture: $ARCH" ;;
-esac
+# --- Pre-flight checks ---
 
-OS=$(uname -s)
-if [ "$OS" != "Darwin" ]; then
-  error "c9watch is currently macOS-only. Detected OS: $OS"
+command -v cargo >/dev/null 2>&1 || error "Rust toolchain not found. Install via https://rustup.rs"
+command -v npm >/dev/null 2>&1   || error "npm not found. Install Node.js first"
+
+# --- Install npm deps if needed ---
+
+if [ ! -d node_modules ]; then
+  info "Installing npm dependencies..."
+  npm install --silent
 fi
 
-info "Detected macOS ($ARCH_LABEL)"
+# --- Build ---
 
-# --- Find latest release ---
+info "Building ${APP_NAME} (release)..."
+npm run tauri build
 
-info "Fetching latest release..."
-
-LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep '"tag_name":' \
-  | head -1 \
-  | cut -d'"' -f4)
-
-if [ -z "$LATEST_TAG" ]; then
-  error "Could not determine the latest release. Check https://github.com/${REPO}/releases"
+if [ ! -d "$BUNDLE" ]; then
+  error "Build succeeded but app bundle not found at ${BUNDLE}"
 fi
 
-info "Latest version: ${LATEST_TAG}"
+# --- Kill running instance ---
 
-# --- Download ---
-
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/${APP_NAME}_${LATEST_TAG}_${ARCH_LABEL}.dmg"
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-
-info "Downloading ${APP_NAME} for ${ARCH_LABEL}..."
-curl -fSL --progress-bar "$DOWNLOAD_URL" -o "$TMPDIR/${APP_NAME}.dmg"
-
-# --- Mount and install ---
-
-info "Mounting DMG..."
-MOUNT_POINT=$(hdiutil attach "$TMPDIR/${APP_NAME}.dmg" -nobrowse -noverify | grep "/Volumes/" | tail -1 | awk '{print $3}')
-
-if [ -z "$MOUNT_POINT" ]; then
-  error "Failed to mount DMG"
+if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+  info "Stopping running ${APP_NAME}..."
+  pkill -x "$APP_NAME"
+  sleep 1
 fi
 
-# Ensure we unmount on exit
-trap 'hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true; rm -rf "$TMPDIR"' EXIT
+# --- Install ---
 
-# Find the .app bundle
-APP_BUNDLE=$(find "$MOUNT_POINT" -maxdepth 1 -name "*.app" -type d | head -1)
-if [ -z "$APP_BUNDLE" ]; then
-  error "No .app bundle found in DMG"
+info "Installing to ${INSTALL_DIR}/${APP_NAME}.app..."
+rm -rf "${INSTALL_DIR}/${APP_NAME}.app"
+cp -R "$BUNDLE" "${INSTALL_DIR}/"
+
+# --- Launch ---
+
+if [ "${1:-}" != "--no-open" ]; then
+  info "Launching ${APP_NAME}..."
+  open "${INSTALL_DIR}/${APP_NAME}.app"
 fi
-
-APP_BASENAME=$(basename "$APP_BUNDLE")
-
-# Remove old version if it exists
-if [ -d "${INSTALL_DIR}/${APP_BASENAME}" ]; then
-  info "Removing previous installation..."
-  rm -rf "${INSTALL_DIR}/${APP_BASENAME}"
-fi
-
-info "Installing to ${INSTALL_DIR}/${APP_BASENAME}..."
-cp -R "$APP_BUNDLE" "${INSTALL_DIR}/"
-
-# --- Done ---
 
 echo ""
-info "c9watch has been installed to ${INSTALL_DIR}/${APP_BASENAME}"
-info "You can launch it from Spotlight or by running:"
-echo ""
-echo "    open '${INSTALL_DIR}/${APP_BASENAME}'"
-echo ""
+info "Done. ${APP_NAME} installed at ${INSTALL_DIR}/${APP_NAME}.app"
